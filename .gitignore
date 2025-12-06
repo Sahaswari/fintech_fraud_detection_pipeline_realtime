@@ -1,0 +1,37 @@
+# VSCode
+.vscode/
+*.code-workspace
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# But ignore runtime files
+docker-compose.override.yml
+
+# Kafka data directories (if running locally without Docker)
+kafka-logs/
+zookeeper-data/
+/tmp/kafka-*
+/tmp/zookeeper/
+
+# ============ Data Files ============
+# Parquet files (they can be large)
+*.parquet
+data/batch_output/*.parquet
+
+# CSV exports (optional - keep if needed for submission)
+# *.csv
+
+# Large data files
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Keep structure but ignore content
+data/**/*
+!data/**/.gitkeep
