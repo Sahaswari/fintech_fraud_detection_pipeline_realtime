@@ -203,8 +203,17 @@ class FraudDetectionStream:
             .queryName("high_value_fraud_writer") \
             .start()
         
-        # Query 3: Console output for monitoring (high value fraud)
-        console_query = high_value_fraud.select(
+        # Query 3: Detect and write impossible travel fraud
+        impossible_travel_fraud = self.detect_impossible_travel(transactions)
+        impossible_travel_query = impossible_travel_fraud.writeStream \
+            .foreachBatch(self.write_to_postgres(impossible_travel_fraud, "fraud_alerts")) \
+            .outputMode("append") \
+            .queryName("impossible_travel_fraud_writer") \
+            .start()
+        
+        # Query 4: Console output for monitoring (all fraud)
+        all_fraud = high_value_fraud.union(impossible_travel_fraud)
+        console_query = all_fraud.select(
             "transaction_id", "user_id", "amount", 
             "location", "fraud_type"
         ).writeStream \
