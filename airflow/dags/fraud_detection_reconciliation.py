@@ -81,11 +81,21 @@ def extract_transaction_data(**context):
     cursor.close()
     conn.close()
     
+    # Calculate Total Ingress (all transactions that entered the system)
+    ingress_count = len(valid_df) + len(fraud_df)
+    ingress_amount = float(valid_df['amount'].sum()) + float(fraud_df['amount'].sum())
+    
+    print(f"📥 Total Ingress: {ingress_count} transactions, ${ingress_amount:,.2f}")
+    print(f"✅ Validated (non-fraud): {len(valid_df)} transactions, ${float(valid_df['amount'].sum()):,.2f}")
+    print(f"🚨 Fraud flagged: {len(fraud_df)} transactions, ${float(fraud_df['amount'].sum()):,.2f}")
+    
     # Save to XCom for next task
     context['task_instance'].xcom_push(key='valid_count', value=len(valid_df))
     context['task_instance'].xcom_push(key='fraud_count', value=len(fraud_df))
     context['task_instance'].xcom_push(key='valid_amount', value=float(valid_df['amount'].sum()))
     context['task_instance'].xcom_push(key='fraud_amount', value=float(fraud_df['amount'].sum()))
+    context['task_instance'].xcom_push(key='ingress_count', value=ingress_count)
+    context['task_instance'].xcom_push(key='ingress_amount', value=round(ingress_amount, 2))
     
     # Save DataFrames as Parquet
     output_dir = Path('/opt/airflow/data/batch_output')
