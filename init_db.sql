@@ -25,16 +25,18 @@ CREATE TABLE IF NOT EXISTS fraud_alerts (
     detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Table for batch processing reconciliation
+-- Table for batch processing reconciliation (Ingress vs Validated)
 CREATE TABLE IF NOT EXISTS daily_reconciliation (
     report_id SERIAL PRIMARY KEY,
     report_date DATE NOT NULL,
-    total_transactions INTEGER NOT NULL,
-    total_amount DECIMAL(15, 2) NOT NULL,
-    fraud_count INTEGER NOT NULL,
-    fraud_amount DECIMAL(15, 2) NOT NULL,
-    valid_count INTEGER NOT NULL,
-    valid_amount DECIMAL(15, 2) NOT NULL,
+    ingress_count INTEGER NOT NULL,        -- Total transactions ingested via Kafka
+    ingress_amount DECIMAL(15, 2) NOT NULL, -- Total amount of all ingested transactions
+    valid_count INTEGER NOT NULL,           -- Validated (non-fraud) transaction count
+    valid_amount DECIMAL(15, 2) NOT NULL,   -- Validated (non-fraud) transaction amount
+    fraud_count INTEGER NOT NULL,           -- Flagged fraud transaction count
+    fraud_amount DECIMAL(15, 2) NOT NULL,   -- Flagged fraud transaction amount
+    discrepancy_amount DECIMAL(15, 2) DEFAULT 0, -- Ingress - (Valid + Fraud) difference
+    reconciliation_status VARCHAR(20) DEFAULT 'BALANCED', -- BALANCED or DISCREPANCY
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
