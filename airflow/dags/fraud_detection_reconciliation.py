@@ -215,6 +215,7 @@ def transform_and_analyze(**context):
 def generate_reconciliation_report(**context):
     """
     Task 3: Generate reconciliation report
+    Compares Total Ingress Amount vs Validated Amount as required
     """
     print("=" * 70)
     print("📋 TASK 3: GENERATING RECONCILIATION REPORT")
@@ -226,23 +227,35 @@ def generate_reconciliation_report(**context):
     fraud_count = ti.xcom_pull(task_ids='extract_data', key='fraud_count')
     valid_amount = ti.xcom_pull(task_ids='extract_data', key='valid_amount')
     fraud_amount = ti.xcom_pull(task_ids='extract_data', key='fraud_amount')
+    ingress_count = ti.xcom_pull(task_ids='extract_data', key='ingress_count')
+    ingress_amount = ti.xcom_pull(task_ids='extract_data', key='ingress_amount')
+    discrepancy_amount = ti.xcom_pull(task_ids='transform_and_analyze', key='discrepancy_amount')
     batch_id = ti.xcom_pull(task_ids='extract_data', key='batch_id')
     
-    total_count = valid_count + fraud_count
-    total_amount = valid_amount + fraud_amount
+    # Determine reconciliation status
+    recon_status = "BALANCED" if abs(discrepancy_amount) < 0.01 else "DISCREPANCY"
     
-    # Create report
+    # Create report with Ingress vs Validated comparison
     report = {
         'batch_id': batch_id,
         'execution_date': context['execution_date'].isoformat(),
-        'summary': {
-            'total_transactions': total_count,
-            'total_amount': round(total_amount, 2),
-            'valid_transactions': valid_count,
-            'valid_amount': round(valid_amount, 2),
-            'fraud_transactions': fraud_count,
+        'ingress': {
+            'total_ingress_count': ingress_count,
+            'total_ingress_amount': round(ingress_amount, 2),
+        },
+        'validated': {
+            'validated_count': valid_count,
+            'validated_amount': round(valid_amount, 2),
+        },
+        'fraud': {
+            'fraud_count': fraud_count,
             'fraud_amount': round(fraud_amount, 2),
-            'fraud_percentage': round((fraud_count / total_count * 100) if total_count > 0 else 0, 2)
+            'fraud_percentage': round((fraud_count / ingress_count * 100) if ingress_count > 0 else 0, 2)
+        },
+        'reconciliation': {
+            'accounted_amount': round(valid_amount + fraud_amount, 2),
+            'discrepancy_amount': round(discrepancy_amount, 2),
+            'status': recon_status
         },
         'metrics': {
             'avg_valid_transaction': round(valid_amount / valid_count, 2) if valid_count > 0 else 0,
@@ -250,23 +263,35 @@ def generate_reconciliation_report(**context):
         }
     }
     
-    # Print report
+    # Print reconciliation report
     print("\n" + "=" * 70)
-    print("📊 RECONCILIATION REPORT")
+    print("📊 RECONCILIATION REPORT: TOTAL INGRESS vs VALIDATED AMOUNT")
     print("=" * 70)
-    print(f"Batch ID: {report['batch_id']}")
-    print(f"Execution Date: {report['execution_date']}")
-    print("\nSUMMARY:")
-    print(f"  Total Transactions: {report['summary']['total_transactions']}")
-    print(f"  Total Amount: ${report['summary']['total_amount']:,.2f}")
-    print(f"  Valid Transactions: {report['summary']['valid_transactions']}")
-    print(f"  Valid Amount: ${report['summary']['valid_amount']:,.2f}")
-    print(f"  Fraud Transactions: {report['summary']['fraud_transactions']}")
-    print(f"  Fraud Amount: ${report['summary']['fraud_amount']:,.2f}")
-    print(f"  Fraud Rate: {report['summary']['fraud_percentage']}%")
-    print("\nMETRICS:")
-    print(f"  Avg Valid Transaction: ${report['metrics']['avg_valid_transaction']:,.2f}")
-    print(f"  Avg Fraud Transaction: ${report['metrics']['avg_fraud_transaction']:,.2f}")
+    print(f"Batch ID:        {report['batch_id']}")
+    print(f"Execution Date:  {report['execution_date']}")
+    print()
+    print("TOTAL INGRESS (All transactions received via Kafka):")
+    print(f"  Count:  {report['ingress']['total_ingress_count']:>10,}")
+    print(f"  Amount: ${report['ingress']['total_ingress_amount']:>14,.2f}")
+    print()
+    print("VALIDATED (Non-fraud transactions):")
+    print(f"  Count:  {report['validated']['validated_count']:>10,}")
+    print(f"  Amount: ${report['validated']['validated_amount']:>14,.2f}")
+    print()
+    print("FRAUD FLAGGED:")
+    print(f"  Count:  {report['fraud']['fraud_count']:>10,}")
+    print(f"  Amount: ${report['fraud']['fraud_amount']:>14,.2f}")
+    print(f"  Rate:   {report['fraud']['fraud_percentage']:>10}%")
+    print()
+    print("RECONCILIATION:")
+    print(f"  Ingress Amount:            ${report['ingress']['total_ingress_amount']:>14,.2f}")
+    print(f"  Accounted (Valid + Fraud): ${report['reconciliation']['accounted_amount']:>14,.2f}")
+    print(f"  Discrepancy:               ${report['reconciliation']['discrepancy_amount']:>14,.2f}")
+    print(f"  Status:                     {report['reconciliation']['status']}")
+    print()
+    print("METRICS:")
+    print(f"  Avg Valid Transaction:  ${report['metrics']['avg_valid_transaction']:>10,.2f}")
+    print(f"  Avg Fraud Transaction:  ${report['metrics']['avg_fraud_transaction']:>10,.2f}")
     print("=" * 70)
     
     # Save report
