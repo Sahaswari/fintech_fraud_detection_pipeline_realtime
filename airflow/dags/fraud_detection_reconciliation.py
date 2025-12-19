@@ -184,6 +184,28 @@ def transform_and_analyze(**context):
             output_dir / f'fraud_types_{batch_id}.csv'
         )
     
+    # Analysis 4: Ingress vs Validated reconciliation
+    ti = context['task_instance']
+    ingress_count = ti.xcom_pull(task_ids='extract_data', key='ingress_count')
+    ingress_amount = ti.xcom_pull(task_ids='extract_data', key='ingress_amount')
+    valid_amount = ti.xcom_pull(task_ids='extract_data', key='valid_amount')
+    fraud_amount = ti.xcom_pull(task_ids='extract_data', key='fraud_amount')
+    
+    accounted_amount = round(valid_amount + fraud_amount, 2)
+    discrepancy = round(ingress_amount - accounted_amount, 2)
+    
+    print("\n📋 Ingress vs Validated Reconciliation:")
+    print(f"  Total Ingress Amount:      ${ingress_amount:>12,.2f}")
+    print(f"  Validated Amount:          ${valid_amount:>12,.2f}")
+    print(f"  Fraud Amount:              ${fraud_amount:>12,.2f}")
+    print(f"  Accounted (Valid + Fraud): ${accounted_amount:>12,.2f}")
+    print(f"  Discrepancy:               ${discrepancy:>12,.2f}")
+    if abs(discrepancy) < 0.01:
+        print("  Status: ✅ BALANCED")
+    else:
+        print("  Status: ⚠️  DISCREPANCY DETECTED")
+    
+    context['task_instance'].xcom_push(key='discrepancy_amount', value=discrepancy)
     context['task_instance'].xcom_push(key='analysis_complete', value=True)
     
     print("\n✓ Analysis complete")
