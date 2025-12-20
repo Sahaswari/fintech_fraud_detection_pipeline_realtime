@@ -303,26 +303,28 @@ def generate_reconciliation_report(**context):
     
     print(f"\n✓ Report saved to: {report_file}")
     
-    # Store in database
+    # Store in database with ingress tracking and discrepancy detection
     pg_hook = PostgresHook(postgres_conn_id='postgres_fraud')
     conn = pg_hook.get_conn()
     cursor = conn.cursor()
     
     insert_query = """
         INSERT INTO daily_reconciliation 
-        (report_date, total_transactions, total_amount, fraud_count, 
-         fraud_amount, valid_count, valid_amount)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        (report_date, ingress_count, ingress_amount, valid_count, valid_amount,
+         fraud_count, fraud_amount, discrepancy_amount, reconciliation_status)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
     
     cursor.execute(insert_query, (
         context['execution_date'].date(),
-        total_count,
-        total_amount,
+        ingress_count,
+        ingress_amount,
+        valid_count,
+        valid_amount,
         fraud_count,
         fraud_amount,
-        valid_count,
-        valid_amount
+        discrepancy_amount,
+        recon_status
     ))
     
     conn.commit()
