@@ -71,4 +71,21 @@ ORDER BY transaction_date DESC;
 
 COMMENT ON TABLE valid_transactions IS 'Stores validated non-fraudulent transactions';
 COMMENT ON TABLE fraud_alerts IS 'Stores detected fraudulent transactions with fraud type';
-COMMENT ON TABLE daily_reconciliation IS 'Daily batch processing reconciliation reports';
+COMMENT ON TABLE daily_reconciliation IS 'Reconciliation reports comparing total ingress vs validated amounts';
+
+-- View for reconciliation overview (Ingress vs Validated)
+CREATE OR REPLACE VIEW reconciliation_overview AS
+SELECT 
+    report_date,
+    ingress_count,
+    ingress_amount,
+    valid_count,
+    valid_amount,
+    fraud_count,
+    fraud_amount,
+    (valid_amount + fraud_amount) as accounted_amount,
+    discrepancy_amount,
+    reconciliation_status,
+    ROUND((fraud_amount / NULLIF(ingress_amount, 0)) * 100, 2) as fraud_rate_pct
+FROM daily_reconciliation
+ORDER BY report_date DESC;
