@@ -239,11 +239,60 @@ def export_to_data_warehouse(**context):
     print(f"📅 Partition date: {partition_date}")
     print(f"📊 Valid transactions to export: {len(valid_df)}")
     print(f"📊 Fraud records to archive: {len(fraud_df)}")
+    
+    # --- Write validated transactions to Data Warehouse (date-partitioned) ---
+    valid_warehouse_dir = warehouse_base / 'valid_transactions' / f'date={partition_date}'
+    valid_warehouse_dir.mkdir(parents=True, exist_ok=True)
+    
+    if len(valid_df) > 0:
+        valid_file = valid_warehouse_dir / f'valid_{batch_id}.parquet'
+        valid_df.to_parquet(valid_file, index=False, engine='pyarrow')
+        print(f"✓ Validated data written to: {valid_file}")
+    else:
+        print("⚠️  No validated transactions to export")
+    
+    # --- Archive fraud records to Data Warehouse ---
+    fraud_warehouse_dir = warehouse_base / 'fraud_archive' / f'date={partition_date}'
+    fraud_warehouse_dir.mkdir(parents=True, exist_ok=True)
+    
+    if len(fraud_df) > 0:
+        fraud_file = fraud_warehouse_dir / f'fraud_{batch_id}.parquet'
+        fraud_df.to_parquet(fraud_file, index=False, engine='pyarrow')
+        print(f"✓ Fraud archive written to: {fraud_file}")
+    else:
+        print("⚠️  No fraud records to archive")
+    
+    # --- Calculate total volume processed ---
+    valid_volume = float(valid_df['amount'].sum()) if len(valid_df) > 0 else 0.0
+    fraud_volume = float(fraud_df['amount'].sum()) if len(fraud_df) > 0 else 0.0
+    total_volume = round(valid_volume + fraud_volume, 2)
+    
+    # Count all Parquet files in the warehouse to show cumulative size
+    all_valid_files = list(warehouse_base.glob('valid_transactions/date=*/valid_*.parquet'))
+    all_fraud_files = list(warehouse_base.glob('fraud_archive/date=*/fraud_*.parquet'))
+    
+    print()
+    print("📊 WAREHOUSE VOLUME SUMMARY:")
+    print(f"  This batch - Valid amount:   ${valid_volume:>12,.2f} ({len(valid_df)} records)")
+    print(f"  This batch - Fraud amount:   ${fraud_volume:>12,.2f} ({len(fraud_df)} records)")
+    print(f"  This batch - Total volume:   ${total_volume:>12,.2f}")
+    print(f"  Warehouse files (valid):     {len(all_valid_files)}")
+    print(f"  Warehouse files (fraud):     {len(all_fraud_files)}")
+    
+    # Push warehouse metrics to XCom
+    ti.xcom_push(key='warehouse_valid_volume', value=valid_volume)
+    ti.xcom_push(key='warehouse_fraud_volume', value=fraud_volume)
+    ti.xcom_push(key='warehouse_total_volume', value=total_volume)
+    ti.xcom_push(key='warehouse_valid_files', value=len(all_valid_files))
+    ti.xcom_push(key='warehouse_fraud_files', value=len(all_fraud_files))
+    
+    print("\n✓ Data warehouse export complete")
+    print("=" * 70)
 
 
 def generate_reconciliation_report(**context):
     """
-    Task 3: Generate reconciliation report
+    Task 4: Generate reconciliation report
     Compares Total Ingress Amount vs Validated Amount as required
     """
     print("=" * 70)
