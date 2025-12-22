@@ -426,6 +426,12 @@ transform_task = PythonOperator(
     dag=dag,
 )
 
+warehouse_export_task = PythonOperator(
+    task_id='export_to_warehouse',
+    python_callable=export_to_data_warehouse,
+    dag=dag,
+)
+
 report_task = PythonOperator(
     task_id='generate_report',
     python_callable=generate_reconciliation_report,
@@ -433,4 +439,5 @@ report_task = PythonOperator(
 )
 
 # Define task dependencies
-extract_task >> transform_task >> report_task
+# ETL Pipeline: Extract → Transform → Export to Warehouse → Generate Report
+extract_task >> transform_task >> warehouse_export_task >> report_task
