@@ -9,6 +9,7 @@ import seaborn as sns
 from datetime import datetime, timedelta
 import psycopg2
 from pathlib import Path
+import glob
 
 class FraudAnalytics:
     def __init__(self):
@@ -209,6 +210,70 @@ class FraudAnalytics:
         
         return fraud_by_location
     
+    def analyze_warehouse_status(self):
+        """Analysis 5: Data Warehouse (Parquet) Status"""
+        print("\n📈 Analysis 5: Data Warehouse Status")
+        
+        warehouse_base = Path('data/warehouse')
+        
+        # Scan valid transactions warehouse
+        valid_files = list(warehouse_base.glob('valid_transactions/date=*/valid_*.parquet'))
+        fraud_files = list(warehouse_base.glob('fraud_archive/date=*/fraud_*.parquet'))
+        
+        # Calculate partition dates
+        valid_partitions = set()
+        for f in valid_files:
+            part = f.parent.name.replace('date=', '')
+            valid_partitions.add(part)
+        
+        fraud_partitions = set()
+        for f in fraud_files:
+            part = f.parent.name.replace('date=', '')
+            fraud_partitions.add(part)
+        
+        # Calculate total warehouse size
+        valid_size_bytes = sum(f.stat().st_size for f in valid_files) if valid_files else 0
+        fraud_size_bytes = sum(f.stat().st_size for f in fraud_files) if fraud_files else 0
+        total_size_mb = (valid_size_bytes + fraud_size_bytes) / (1024 * 1024)
+        
+        # Load warehouse data volumes
+        total_valid_rows = 0
+        total_fraud_rows = 0
+        
+        for f in valid_files:
+            try:
+                df = pd.read_parquet(f)
+                total_valid_rows += len(df)
+            except Exception:
+                pass
+        
+        for f in fraud_files:
+            try:
+                df = pd.read_parquet(f)
+                total_fraud_rows += len(df)
+            except Exception:
+                pass
+        
+        self.warehouse_stats = {
+            'valid_files': len(valid_files),
+            'fraud_files': len(fraud_files),
+            'valid_partitions': len(valid_partitions),
+            'fraud_partitions': len(fraud_partitions),
+            'valid_rows': total_valid_rows,
+            'fraud_rows': total_fraud_rows,
+            'total_size_mb': total_size_mb,
+        }
+        
+        print(f"  Valid transaction files:  {len(valid_files)}")
+        print(f"  Fraud archive files:      {len(fraud_files)}")
+        print(f"  Date partitions (valid):  {len(valid_partitions)}")
+        print(f"  Date partitions (fraud):  {len(fraud_partitions)}")
+        print(f"  Total valid rows:         {total_valid_rows:,}")
+        print(f"  Total fraud rows:         {total_fraud_rows:,}")
+        print(f"  Warehouse size:           {total_size_mb:.2f} MB")
+        
+        return self.warehouse_stats
+
     def generate_summary_report(self):
         """Generate comprehensive summary report"""
         print("\n📋 Generating Summary Report...")
@@ -221,6 +286,11 @@ class FraudAnalytics:
         fraud_amount = self.fraud_df['amount'].sum()
         total_amount = valid_amount + fraud_amount
         
+        # Avoid zero-division when no transactions exist
+        valid_pct = (total_valid / total_trans * 100) if total_trans > 0 else 0.0
+        fraud_pct = (total_fraud / total_trans * 100) if total_trans > 0 else 0.0
+        fraud_rate = (total_fraud / total_trans * 100) if total_trans > 0 else 0.0
+        
         report = f"""
 {'=' * 70}
                     FRAUD DETECTION ANALYTICS REPORT
@@ -230,8 +300,8 @@ class FraudAnalytics:
 EXECUTIVE SUMMARY
 {'=' * 70}
 Total Transactions Processed:     {total_trans:,}
-Valid Transactions:               {total_valid:,} ({total_valid/total_trans*100:.2f}%)
-Fraudulent Transactions:          {total_fraud:,} ({total_fraud/total_trans*100:.2f}%)
+Valid Transactions:               {total_valid:,} ({valid_pct:.2f}%)
+Fraudulent Transactions:          {total_fraud:,} ({fraud_pct:.2f}%)
 
 Total Transaction Volume:         ${total_amount:,.2f}
 Valid Transaction Amount:         ${valid_amount:,.2f}
@@ -254,9 +324,26 @@ TOP FRAUD CATEGORIES
 {'=' * 70}
 FRAUD DETECTION EFFECTIVENESS
 {'=' * 70}
-Fraud Detection Rate:             {total_fraud/total_trans*100:.2f}%
+Fraud Detection Rate:             {fraud_rate:.2f}%
 Amount Saved (Fraud Prevented):   ${fraud_amount:,.2f}
-
+"""
+        
+        # Add warehouse stats if available
+        if hasattr(self, 'warehouse_stats'):
+            ws = self.warehouse_stats
+            report += f"""
+{'=' * 70}
+DATA WAREHOUSE STATUS (Parquet)
+{'=' * 70}
+Valid Transaction Files:          {ws['valid_files']}
+Fraud Archive Files:              {ws['fraud_files']}
+Date Partitions (Valid):          {ws['valid_partitions']}
+Date Partitions (Fraud):          {ws['fraud_partitions']}
+Total Rows in Warehouse:          {ws['valid_rows'] + ws['fraud_rows']:,}
+Warehouse Size:                   {ws['total_size_mb']:.2f} MB
+"""
+        
+        report += f"""
 {'=' * 70}
 RECOMMENDATIONS
 {'=' * 70}
@@ -294,6 +381,7 @@ RECOMMENDATIONS
         fraud_types = self.analyze_fraud_types()
         time_patterns = self.analyze_time_patterns()
         geo_patterns = self.analyze_geographic_patterns()
+        warehouse_status = self.analyze_warehouse_status()
         
         # Generate summary
         report = self.generate_summary_report()
