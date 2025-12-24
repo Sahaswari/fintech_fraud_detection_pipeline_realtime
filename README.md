@@ -12,6 +12,24 @@ Real-time fraud detection system for financial transactions using Lambda archite
 
 ## 🏗️ System Architecture
 
+> **Full architecture diagram:** See [docs/architecture_diagram.md](docs/architecture_diagram.md) for the complete Mermaid diagram with data flows, component details, and container network layout.
+
+```mermaid
+flowchart LR
+    subgraph HOT["⚡ Hot Path (Real-Time)"]
+        P["🏦 Producer"] -->|JSON| K["📨 Kafka"]
+        K -->|Stream| S["⚡ Spark Streaming"]
+        S -->|Valid/Fraud| DB["🐘 PostgreSQL"]
+    end
+    subgraph COLD["🔄 Cold Path (Batch)"]
+        DB -->|6h batch| A["🌀 Airflow DAG"]
+        A -->|Parquet| W["📦 Data Warehouse"]
+        A -->|Recon report| DB
+    end
+    DB --> R["📊 Analytics Reports"]
+    W -.->|Warehouse stats| R
+```
+
 ### Components
 - **Kafka:** Message broker for transaction streaming
 - **Spark Structured Streaming:** Real-time fraud detection
