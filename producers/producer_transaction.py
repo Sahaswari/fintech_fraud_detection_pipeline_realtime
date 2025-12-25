@@ -190,7 +190,8 @@ class TransactionProducer:
             print(f"📊 Total Transactions: {transaction_count}")
             print(f"✓ Normal Transactions: {transaction_count - fraud_count}")
             print(f"🚨 Fraud Transactions: {fraud_count}")
-            print(f"📉 Fraud Rate: {(fraud_count/transaction_count*100):.2f}%")
+            fraud_rate = (fraud_count / transaction_count * 100) if transaction_count > 0 else 0.0
+            print(f"📉 Fraud Rate: {fraud_rate:.2f}%")
             print("=" * 70)
             
             self.producer.flush()
