@@ -337,11 +337,9 @@ docker-compose down -v
 
 ---
 
-## 👤 Author
-
-**[Your Name]**  
-Applied Big Data Engineering  
-December 2024
+**GROUP 12**  
+EG/2020/4185
+EG/2020/4184
 
 ---
 
